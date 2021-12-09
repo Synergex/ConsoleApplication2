@@ -1,0 +1,24 @@
+import System
+
+    ;;; <summary>
+    ;;; The main entry point for the application.
+    ;;; </summary>
+    main
+    .include 'DBLDIR:windows.def'
+
+    record
+        wnd         ,i4
+        imgWidth    ,int
+        imgHeight   ,int
+
+    proc
+        open(15,O,'TT:')
+        xcall w_init(0,15,10)
+        xcall w_proc(WP_CREATE,WND,"Main",20,60,WP_PLACE,WND,1,1)
+
+        xcall w_disp(WND,WD_POS,2,2,"Test program")
+        xcall w_updt
+
+        MyApp.Settings.ScreenCapture("C:\temp\screen.png",imgWidth,imgHeight)
+        stop
+    endmain

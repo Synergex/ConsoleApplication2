@@ -1,0 +1,135 @@
+import System
+import System.Drawing
+import System.Drawing.Imaging
+import System.Windows.Forms
+import System.Runtime.InteropServices
+
+.include 'DBLDIR:windows.def'
+
+namespace MyApp
+
+    public class Settings
+
+        public static method ScreenCapture  ,void
+        req in  filename                ,string
+        req out imgWidth                ,int
+        req out imgHeight               ,int
+        endparams
+        proc
+            try
+            begin
+            data synergyForm ,@System.Windows.Forms.Form ,Settings.GetForm(true)
+
+            data bmpScreenshot ,@System.Drawing.Bitmap
+            data gfxScreenshot ,@System.Drawing.Graphics
+
+            data VertScaleFactor ,float ,0.0
+            data HorScaleFactor ,float ,0.0
+                Settings.GetScalingFactor(VertScaleFactor,HorScaleFactor)
+
+            data imgSize ,Size ,synergyForm.Bounds.Size
+
+                imgSize.Width = (int)((float)imgSize.Width * HorScaleFactor)
+                imgSize.Height = (int)((float)imgSize.Height * VertScaleFactor)
+
+            data imgX ,int ,(int)((float)synergyForm.Bounds.X * HorScaleFactor)
+            data imgY ,int ,(int)((float)synergyForm.Bounds.Y * VertScaleFactor)
+
+                imgWidth = imgSize.Width
+                imgHeight = imgSize.Height
+
+                ;; Set the bitmap object to the size of the screen
+                bmpScreenshot = new Bitmap(imgWidth, imgHeight, PixelFormat.Format32bppArgb)
+                ;; Create a graphics object from the bitmap
+                gfxScreenshot = Graphics.FromImage(bmpScreenshot)
+
+            data dpix ,int ,gfxScreenshot.DpiX
+            data dpiy ,int ,gfxScreenshot.DpiY
+
+
+                ;; Take the screenshot from the upper left corner to the right bottom corner
+                gfxScreenshot.CopyFromScreen(imgX, imgY, 0, 0, imgSize, CopyPixelOperation.SourceCopy)
+
+                Clipboard.SetImage(bmpScreenshot)
+
+                gfxScreenshot.Dispose();
+
+                bmpScreenshot.Save(filename, ImageFormat.Jpeg)
+            end
+            catch (excp ,@Exception)
+                nop
+            endtry
+        endmethod
+
+        public static method GetForm    ,@System.Windows.Forms.Form
+        req in  aWantContainer          ,boolean
+        endparams
+        record
+            synergyForm ,@System.Windows.Forms.Form
+            hWnd        ,IntPtr
+            hndl        ,System.Runtime.InteropServices.GCHandle
+        proc
+            try
+            begin
+                hWnd = Settings.GetWindowHandle(aWantContainer)
+                hndl = System.Runtime.InteropServices.GCHandle.FromIntPtr(hWnd)
+                synergyForm = (System.Windows.Forms.Form)hndl.Target
+                hndl.Free()
+            end
+            catch (excp ,@Exception)
+            begin
+                synergyForm = ^null
+            end
+            endtry
+            mreturn synergyForm
+        endmethod
+
+        public static method GetWindowHandle ,int
+        req in  wantContainer       ,boolean
+        endparams
+        record
+            hdl   ,int
+        proc
+            if (wantContainer == true) then
+                hdl = %w_info(WIF_HWND, WIFH_CONTAINER)
+            else
+                hdl = %w_info(WIF_HWND)
+            mreturn hdl
+        endmethod
+
+        {DllImport("gdi32.dll")}
+        static method GetDeviceCaps ,int
+        hdc        ,IntPtr
+        nIndex     ,int
+        endparams
+        proc
+        endmethod
+
+        ;; http://pinvoke.net/default.aspx/gdi32/GetDeviceCaps.html
+        public enum DeviceCap
+            HORZRES ,8
+            VERTRES ,10
+            DESKTOPVERTRES  ,117
+            DESKTOPHORZRES  ,118
+        endenum
+
+        ;; get high DPI scaling factor
+        public static method GetScalingFactor ,void
+        req out VertScalingFactor      ,float
+        req out HorScalingFactor       ,float
+        endparams
+        proc
+        data g                         ,@Graphics      ,Graphics.FromHwnd(IntPtr.Zero)
+        data desktop                   ,IntPtr         ,g.GetHdc()
+        data LogicalScreenHeight       ,int            ,GetDeviceCaps(desktop, (int)DeviceCap.VERTRES)
+        data PhysicalScreenHeight      ,int            ,GetDeviceCaps(desktop, (int)DeviceCap.DESKTOPVERTRES)
+        data LogicalScreenWidth        ,int            ,GetDeviceCaps(desktop, (int)DeviceCap.HORZRES)
+        data PhysicalScreenWidth       ,int            ,GetDeviceCaps(desktop, (int)DeviceCap.DESKTOPHORZRES)
+
+            VertScalingFactor = (float)PhysicalScreenHeight / (float)LogicalScreenHeight
+            HorScalingFactor = (float)PhysicalScreenWidth / (float)LogicalScreenWidth
+        endmethod
+
+    endclass
+
+endnamespace
